@@ -16,9 +16,10 @@ public class tcss543 {
 		G1 = new SimpleGraph();
 		if (args.length != 0) {
 			GraphInput.LoadSimpleGraph(G1, args[0]);
-			FordFulkerson ff = new FordFulkerson();
+			//FordFulkerson ff = new FordFulkerson();
+			PrePush pp = new PrePush();
 			long startTime = System.nanoTime();
-			int maxflow = ff.getMaxFlow(G1, "s", "t");
+			double maxflow = pp.getMaxFlow(G1);
 			long endTime = System.nanoTime();
 			System.out.println("Ford Fulkerson took: " + (endTime - startTime) / 100000 + " ms");
 			System.out.println("Ford-Fulkerson Maximum Flow: " + maxflow);
