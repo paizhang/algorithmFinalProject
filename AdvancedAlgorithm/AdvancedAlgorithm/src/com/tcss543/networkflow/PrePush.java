@@ -15,7 +15,7 @@ import com.tcss543.graphcode.Vertex;
  * negative capacity. 
  * 
  * @author Pai Zhang
- * @version 0.0
+ * @version 1.0
  */
 public class PrePush {
 	
@@ -30,6 +30,12 @@ public class PrePush {
 	
 	/* A SimpleGraph object */
 	private SimpleGraph simpleGraph;
+	
+	/* A vertex in the graph with positive excess value */
+	private Vertex vExcess = null;
+	
+	/* The source node of the graph */
+	private Vertex sNode = null;
 	
 	/**
 	 * Initialize the input graph
@@ -92,6 +98,7 @@ public class PrePush {
 			//System.out.println("Vertex " + v.getName());
 			if(v.getName().equals("s")) {
 				heights.put(v.getName().toString(), simpleGraph.numVertices());
+				sNode = v;
 			}
 			else {
 				heights.put(v.getName().toString(), 0);
@@ -124,7 +131,7 @@ public class PrePush {
 	}
 	
 	/**
-	 * Print out the status of flow of all edges
+	 * Prints out the status of flow of all edges
 	 */
 	private void showFlowStatus() {
 		Iterator<Edge> i;
@@ -134,33 +141,6 @@ public class PrePush {
 			e = (Edge) i.next();
 			//System.out.println("Flow of Edge " + e.getFirstEndpoint().getName() + " " 
 					//+ e.getSecondEndpoint().getName() + ":" + flow.get(e));
-		}
-	}
-	
-	/**
-	 * Update the excess status of each vertex. The method should be 
-	 * called when the flow hashmap is changed. 
-	 */
-	private void updateExcess() {
-		Iterator<Vertex> i;
-		Iterator<Edge> j;
-		Vertex v;
-		Edge e;
-		//System.out.println("Excess status:");
-		double input = 0.0, output = 0.0, excessValue = 0.0;
-		for (i = simpleGraph.vertices(); i.hasNext();) {
-			v = (Vertex) i.next();
-			for (j = simpleGraph.incidentEdges(v); j.hasNext();) {
-				e = j.next();
-				if (e.getFirstEndpoint().getName().equals(v.getName()))
-					output += flow.get(e);
-				else
-					input += flow.get(e);
-			}
-			excessValue = input - output;
-			excess.put(v, excessValue);
-			//System.out.println("Vertex " + v.getName() + " Excess:" + excessValue);
-			input = output = excessValue = 0.0;
 		}
 	}
 	
@@ -189,6 +169,40 @@ public class PrePush {
 	}
 	
 	/**
+	 * Update the excess status of each vertex. The method should be 
+	 * called when the flow hashmap is changed. 
+	 */
+	private void updateExcess() {
+		Iterator<Vertex> i;
+		Iterator<Edge> j;
+		Vertex v;
+		Edge e;
+		boolean existExcess = false; 
+		//System.out.println("Excess status:");
+		double input = 0.0, output = 0.0, excessValue = 0.0;
+		for (i = simpleGraph.vertices(); i.hasNext();) {
+			v = (Vertex) i.next();
+			for (j = simpleGraph.incidentEdges(v); j.hasNext();) {
+				e = j.next();
+				if (e.getFirstEndpoint().getName().equals(v.getName()))
+					output += flow.get(e);
+				else
+					input += flow.get(e);
+			}
+			excessValue = input - output;
+			if (excessValue > 0.0 && existExcess == false && !v.getName().equals("t")) {
+				vExcess = v;
+				existExcess = true;
+			}
+			excess.put(v, excessValue);
+			//System.out.println("Vertex " + v.getName() + " Excess:" + excessValue);
+			input = output = excessValue = 0.0;
+		}
+		if (existExcess == false)
+			vExcess = null;
+	}
+	
+	/**
 	 * Push an edge if it is applicable. It will increase the flow of the edge 
 	 * if this edge is a forward edge. It will decrease the flow of the edge 
 	 * if this edge is a backward edge. 
@@ -203,20 +217,26 @@ public class PrePush {
 	 */
 	private boolean push(Edge e, Vertex v) {
 		boolean res = true;
+		Iterator<Edge> j;
+		double input = 0.0, output = 0.0, excessValue = 0.0;
 		if (excess.get(v) > 0.0 && (heights.get(v.getName().toString()) > heights.get(simpleGraph.opposite(v, e).getName().toString())) 
 				&& ((e.getFirstEndpoint().equals(v) && flow.get(e) < Double.parseDouble(e.getData().toString())) || (e.getSecondEndpoint().equals(v) 
 						&& flow.get(e) > 0.0))) {
 			if (e.getFirstEndpoint().equals(v)) {
 				double delta = Math.min(excess.get(v),(Double.parseDouble(e.getData().toString()) - Double.parseDouble(flow.get(e).toString())));
 				flow.put(e, flow.get(e) + delta);
-				updateExcess();
-				showFlowStatus();
+				Vertex v1 = e.getFirstEndpoint();
+				Vertex v2 = e.getSecondEndpoint();
+				excess.put(v1, excess.get(v1) - delta);
+				excess.put(v2, excess.get(v2) + delta);
 			}
 			else {
 				double delta = Math.min(excess.get(v), flow.get(e));
 				flow.put(e, flow.get(e) - delta);
-				updateExcess();
-				showFlowStatus();
+				Vertex v1 = e.getFirstEndpoint();
+				Vertex v2 = e.getSecondEndpoint();
+				excess.put(v1, excess.get(v1) + delta);
+				excess.put(v2, excess.get(v2) - delta);
 			}
 		}
 		else {
@@ -235,16 +255,6 @@ public class PrePush {
 		Iterator<Edge> j;
 		Edge e;
 		boolean allEdgesSatisfied = true;
-		for (j = simpleGraph.incidentEdges(v); j.hasNext();) {
-			e = j.next();
-			if ((e.getFirstEndpoint().equals(v) && (flow.get(e) < Double.parseDouble(e.getData().toString())))
-					|| (e.getSecondEndpoint().equals(v) && flow.get(e) > 0)) {
-				if (heights.get(v.getName()) > heights.get(simpleGraph.opposite(v, e).getName().toString())) {
-					allEdgesSatisfied = false;
-					break;
-				}
-			}
-		}
 		if (excess.get(v) > 0 && allEdgesSatisfied) {
 			heights.put(v.getName().toString(), heights.get(v.getName().toString()) + 1);
 		}
@@ -276,29 +286,40 @@ public class PrePush {
     	initializeHeights();
     	initializeFlow();
     	updateExcess();
+    	Edge minheight = null;
+    	Vertex w = null;
     	while ((v = findExcessNode()) != null) {
     		//System.out.println("Node " + v.getName() + "with excess!");
     		//excess.put(v, 0.0);
+    		int height = heights.get(v.getName().toString());
     		boolean pushSuccess = false;
     		for (itIncidentEdge = simpleGraph.incidentEdges(v); itIncidentEdge.hasNext();) {
     			e = itIncidentEdge.next();
-    			if (push(e,v)) {
-    				pushSuccess = true;
+    			if (e.getFirstEndpoint().equals(v) && flow.get(e) < Double.parseDouble(e.getData().toString())) {
+	    			w = e.getSecondEndpoint();
+	    			if (heights.get(w.getName().toString()) < height) {
+	    				minheight = e;
+	    				height = heights.get(w.getName().toString());
+	    				break;
+	    			}
+    			}
+    			else if (e.getSecondEndpoint().equals(v) && flow.get(e) > 0){
+    				w = e.getFirstEndpoint();
+    				if (heights.get(w.getName().toString()) < height) {
+	    				minheight = e;
+	    				height = heights.get(w.getName().toString());
+	    				break;
+	    			}
     			}
     		}
-    		if (!pushSuccess) {
+    		if (minheight == null || !push(minheight,v))
     			relabel(v);
-    		}
+    		minheight = null;
     	}
-    	Iterator<Edge> i;
-		for (i = simpleGraph.edges(); i.hasNext();) {
-			e = (Edge) i.next();
-			//System.out.println("Edge " + e.getFirstEndpoint().getName().toString() 
-					//+ " " + e.getSecondEndpoint().getName().toString() + ":" + flow.get(e));
-			if(e.getFirstEndpoint().getName().equals("s")) {
-				maxFlow += flow.get(e);
-			}
-		}
+    	for (itIncidentEdge = simpleGraph.incidentEdges(sNode); itIncidentEdge.hasNext();) {
+			e = itIncidentEdge.next();
+			maxFlow += flow.get(e);
+    	}
     	return maxFlow;
     }
 }
